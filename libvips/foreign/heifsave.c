@@ -768,6 +768,65 @@ vips_foreign_save_heif_build(VipsObject *object)
 	heif->data = heif_image_get_plane(heif->img,
 		heif_channel_interleaved, &heif->stride);
 
+	/* Set HDR metadata on the image if present.
+	 */
+#ifdef HAVE_HEIF_CONTENT_LIGHT_LEVEL
+	if (vips_image_get_typeof(save->ready,
+			"heif-cll-max-content-light-level")) {
+		heif_content_light_level cll;
+		int v;
+
+		if (!vips_image_get_int(save->ready,
+				"heif-cll-max-content-light-level", &v))
+			cll.max_content_light_level = v;
+		if (!vips_image_get_int(save->ready,
+				"heif-cll-max-pic-average-light-level", &v))
+			cll.max_pic_average_light_level = v;
+		heif_image_set_content_light_level(heif->img, &cll);
+	}
+#endif /*HAVE_HEIF_CONTENT_LIGHT_LEVEL*/
+
+#ifdef HAVE_HEIF_MASTERING_DISPLAY_COLOUR_VOLUME
+	if (vips_image_get_typeof(save->ready,
+			"heif-mdcv-display-primaries-x-0")) {
+		heif_mastering_display_colour_volume mdcv;
+		int v;
+
+		if (!vips_image_get_int(save->ready,
+				"heif-mdcv-display-primaries-x-0", &v))
+			mdcv.display_primaries_x[0] = v;
+		if (!vips_image_get_int(save->ready,
+				"heif-mdcv-display-primaries-y-0", &v))
+			mdcv.display_primaries_y[0] = v;
+		if (!vips_image_get_int(save->ready,
+				"heif-mdcv-display-primaries-x-1", &v))
+			mdcv.display_primaries_x[1] = v;
+		if (!vips_image_get_int(save->ready,
+				"heif-mdcv-display-primaries-y-1", &v))
+			mdcv.display_primaries_y[1] = v;
+		if (!vips_image_get_int(save->ready,
+				"heif-mdcv-display-primaries-x-2", &v))
+			mdcv.display_primaries_x[2] = v;
+		if (!vips_image_get_int(save->ready,
+				"heif-mdcv-display-primaries-y-2", &v))
+			mdcv.display_primaries_y[2] = v;
+		if (!vips_image_get_int(save->ready,
+				"heif-mdcv-white-point-x", &v))
+			mdcv.white_point_x = v;
+		if (!vips_image_get_int(save->ready,
+				"heif-mdcv-white-point-y", &v))
+			mdcv.white_point_y = v;
+		if (!vips_image_get_int(save->ready,
+				"heif-mdcv-max-luminance", &v))
+			mdcv.max_display_mastering_luminance = v;
+		if (!vips_image_get_int(save->ready,
+				"heif-mdcv-min-luminance", &v))
+			mdcv.min_display_mastering_luminance = v;
+		heif_image_set_mastering_display_colour_volume(
+			heif->img, &mdcv);
+	}
+#endif /*HAVE_HEIF_MASTERING_DISPLAY_COLOUR_VOLUME*/
+
 	/* Write data.
 	 */
 	if (vips_sink_disc(save->ready, vips_foreign_save_heif_write_block, heif))
