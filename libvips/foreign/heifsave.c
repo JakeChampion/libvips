@@ -727,6 +727,10 @@ vips_foreign_save_heif_build(VipsObject *object)
 
 	heif->page_width = save->ready->Xsize;
 	heif->page_height = vips_image_get_page_height(save->ready);
+	if (heif->page_height <= 0) {
+		vips_error("heifsave", "%s", _("bad page height"));
+		return -1;
+	}
 	heif->n_pages = save->ready->Ysize / heif->page_height;
 	has_alpha = save->ready->Bands > 3;
 
@@ -767,6 +771,10 @@ vips_foreign_save_heif_build(VipsObject *object)
 
 	heif->data = heif_image_get_plane(heif->img,
 		heif_channel_interleaved, &heif->stride);
+	if (!heif->data) {
+		vips_error("heifsave", "%s", _("unable to get image plane"));
+		return -1;
+	}
 
 	/* Set HDR metadata on the image if present.
 	 */
