@@ -155,6 +155,10 @@ typedef struct _VipsForeignLoadHeif {
 	 */
 	gboolean has_alpha;
 
+	/* TRUE if the image has no chroma (monochrome/grayscale).
+	 */
+	gboolean is_mono;
+
 	/* Size of final output image.
 	 */
 	int width;
@@ -198,6 +202,11 @@ typedef struct _VipsForeignLoadHeif {
 	 */
 	int stride;
 	const uint8_t *data;
+
+	/* Alpha plane data for monochrome images (separate plane).
+	 */
+	int stride_alpha;
+	const uint8_t *data_alpha;
 
 	/* Set from subclasses.
 	 */
@@ -323,6 +332,7 @@ vips_foreign_load_heif_dispose(GObject *gobject)
 	VipsForeignLoadHeif *heif = (VipsForeignLoadHeif *) gobject;
 
 	heif->data = NULL;
+	heif->data_alpha = NULL;
 	VIPS_FREEF(heif_image_release, heif->img);
 	VIPS_FREEF(heif_image_handle_release, heif->handle);
 	VIPS_FREEF(heif_context_free, heif->ctx);
@@ -521,6 +531,7 @@ vips_foreign_load_heif_set_page(VipsForeignLoadHeif *heif,
 		VIPS_FREEF(heif_image_handle_release, heif->handle);
 		VIPS_FREEF(heif_image_release, heif->img);
 		heif->data = NULL;
+		heif->data_alpha = NULL;
 		heif->thumbnail_set = FALSE;
 
 		error = heif_context_get_image_handle(heif->ctx,
@@ -586,7 +597,11 @@ vips_foreign_load_heif_set_header(VipsForeignLoadHeif *heif, VipsImage *out)
 #ifdef DEBUG
 	printf("heif_image_handle_has_alpha_channel() = %d\n", heif->has_alpha);
 #endif /*DEBUG*/
-	bands = heif->has_alpha ? 4 : 3;
+
+	if (heif->is_mono)
+		bands = heif->has_alpha ? 2 : 1;
+	else
+		bands = heif->has_alpha ? 4 : 3;
 
 #ifdef DEBUG
 	printf("heif_image_handle_get_luma_bits_per_pixel() = %d\n",
@@ -752,17 +767,18 @@ vips_foreign_load_heif_set_header(VipsForeignLoadHeif *heif, VipsImage *out)
 	vips_image_set_int(out, "heif-bitdepth", heif->bits_per_pixel);
 
 	if (heif->bits_per_pixel > 8) {
-		interpretation = VIPS_INTERPRETATION_RGB16;
+		interpretation = heif->is_mono
+			? VIPS_INTERPRETATION_GREY16
+			: VIPS_INTERPRETATION_RGB16;
 		format = VIPS_FORMAT_USHORT;
 	}
 	else {
-		interpretation = VIPS_INTERPRETATION_sRGB;
+		interpretation = heif->is_mono
+			? VIPS_INTERPRETATION_B_W
+			: VIPS_INTERPRETATION_sRGB;
 		format = VIPS_FORMAT_UCHAR;
 	}
 
-	/* FIXME .. we always decode to RGB in generate. We should check for
-	 * all grey images, perhaps.
-	 */
 	if (vips_image_pipelinev(out, VIPS_DEMAND_STYLE_THINSTRIP, NULL))
 		return -1;
 	vips_image_init_fields(out,
@@ -873,6 +889,8 @@ vips_foreign_load_heif_header(VipsForeignLoad *load)
 		vips_error(class->nickname, "%s", _("undefined bits per pixel"));
 		return -1;
 	}
+	heif->is_mono =
+		heif_image_handle_get_chroma_bits_per_pixel(heif->handle) == 0;
 
 	for (i = heif->page + 1; i < heif->page + heif->n; i++) {
 		if (vips_foreign_load_heif_set_page(heif, i, heif->thumbnail))
@@ -880,7 +898,9 @@ vips_foreign_load_heif_header(VipsForeignLoad *load)
 		if (heif_image_handle_get_width(heif->handle) != heif->page_width ||
 			heif_image_handle_get_height(heif->handle) != heif->page_height ||
 			heif_image_handle_get_luma_bits_per_pixel(heif->handle) !=
-				heif->bits_per_pixel) {
+				heif->bits_per_pixel ||
+			(heif_image_handle_get_chroma_bits_per_pixel(
+				 heif->handle) == 0) != heif->is_mono) {
 			vips_error(class->nickname, "%s",
 				_("not all pages are the same size"));
 			return -1;
@@ -944,15 +964,24 @@ vips_foreign_load_heif_generate(VipsRegion *out_region,
 		return -1;
 
 	if (!heif->img) {
-		enum heif_chroma chroma =
-			vips__heif_chroma(heif->bits_per_pixel, heif->has_alpha);
-
 		struct heif_error error;
 		struct heif_decoding_options *options;
+		enum heif_colorspace colorspace;
+		enum heif_chroma chroma;
+
+		if (heif->is_mono) {
+			colorspace = heif_colorspace_monochrome;
+			chroma = heif_chroma_monochrome;
+		}
+		else {
+			colorspace = heif_colorspace_RGB;
+			chroma = vips__heif_chroma(heif->bits_per_pixel,
+				heif->has_alpha);
+		}
 
 		options = heif_decoding_options_alloc();
 		error = heif_decode_image(heif->handle, &heif->img,
-			heif_colorspace_RGB,
+			colorspace,
 			chroma,
 			options);
 		heif_decoding_options_free(options);
@@ -967,10 +996,11 @@ vips_foreign_load_heif_generate(VipsRegion *out_region,
 	}
 
 	if (!heif->data) {
-		int image_width = heif_image_get_width(heif->img,
-			heif_channel_interleaved);
-		int image_height = heif_image_get_height(heif->img,
-			heif_channel_interleaved);
+		enum heif_channel channel = heif->is_mono
+			? heif_channel_Y
+			: heif_channel_interleaved;
+		int image_width = heif_image_get_width(heif->img, channel);
+		int image_height = heif_image_get_height(heif->img, channel);
 
 		/* We can sometimes get inconsistency between the dimensions
 		 * reported on the handle, and the final image we fetch. Error
@@ -984,34 +1014,101 @@ vips_foreign_load_heif_generate(VipsRegion *out_region,
 		}
 
 		if (!(heif->data = heif_image_get_plane_readonly(heif->img,
-				  heif_channel_interleaved, &heif->stride))) {
+				  channel, &heif->stride))) {
 			vips_error(class->nickname,
 				"%s", _("unable to get image data"));
 			return -1;
 		}
+
+		if (heif->is_mono && heif->has_alpha) {
+			if (!(heif->data_alpha = heif_image_get_plane_readonly(
+					  heif->img,
+					  heif_channel_Alpha,
+					  &heif->stride_alpha))) {
+				vips_error(class->nickname,
+					"%s", _("unable to get alpha data"));
+				return -1;
+			}
+		}
 	}
 
-	memcpy(VIPS_REGION_ADDR(out_region, 0, r->top),
-		heif->data + (size_t) heif->stride * line,
-		VIPS_IMAGE_SIZEOF_LINE(out_region->im));
-
-	/* We may need to swap bytes and shift to fill 16 bits.
-	 */
-	if (heif->bits_per_pixel > 8) {
-		int shift = 16 - heif->bits_per_pixel;
-		int ne = VIPS_REGION_N_ELEMENTS(out_region);
+	if (heif->is_mono && heif->has_alpha) {
+		/* Interleave Y and Alpha planes into 2-band output.
+		 */
+		VipsPel *q = VIPS_REGION_ADDR(out_region, 0, r->top);
+		const uint8_t *y =
+			heif->data + (size_t) heif->stride * line;
+		const uint8_t *a =
+			heif->data_alpha + (size_t) heif->stride_alpha * line;
 
 		int i;
-		VipsPel *p;
 
-		p = VIPS_REGION_ADDR(out_region, 0, r->top);
-		for (i = 0; i < ne; i++) {
-			/* We've asked for big endian, we must write native.
-			 */
-			guint16 v = ((p[0] << 8) | p[1]) << shift;
+		if (heif->bits_per_pixel > 8) {
+			int shift = 16 - heif->bits_per_pixel;
 
-			*((guint16 *) p) = v;
-			p += 2;
+			for (i = 0; i < heif->page_width; i++) {
+				/* Planar data is native byte order, shift to
+				 * fill 16 bits.
+				 */
+				guint16 yv = *((guint16 *) (y + i * 2)) << shift;
+				guint16 av = *((guint16 *) (a + i * 2)) << shift;
+
+				*((guint16 *) (q + i * 4)) = yv;
+				*((guint16 *) (q + i * 4 + 2)) = av;
+			}
+		}
+		else {
+			for (i = 0; i < heif->page_width; i++) {
+				q[2 * i] = y[i];
+				q[2 * i + 1] = a[i];
+			}
+		}
+	}
+	else if (heif->is_mono) {
+		/* Single Y plane, copy directly.
+		 */
+		memcpy(VIPS_REGION_ADDR(out_region, 0, r->top),
+			heif->data + (size_t) heif->stride * line,
+			VIPS_IMAGE_SIZEOF_LINE(out_region->im));
+
+		if (heif->bits_per_pixel > 8) {
+			int shift = 16 - heif->bits_per_pixel;
+			int i;
+			VipsPel *p = VIPS_REGION_ADDR(out_region, 0, r->top);
+
+			for (i = 0; i < heif->page_width; i++) {
+				/* Planar data is native byte order, shift to
+				 * fill 16 bits.
+				 */
+				guint16 v = *((guint16 *) p) << shift;
+
+				*((guint16 *) p) = v;
+				p += 2;
+			}
+		}
+	}
+	else {
+		/* Interleaved RGB/RGBA path.
+		 */
+		memcpy(VIPS_REGION_ADDR(out_region, 0, r->top),
+			heif->data + (size_t) heif->stride * line,
+			VIPS_IMAGE_SIZEOF_LINE(out_region->im));
+
+		if (heif->bits_per_pixel > 8) {
+			int shift = 16 - heif->bits_per_pixel;
+			int ne = VIPS_REGION_N_ELEMENTS(out_region);
+			int i;
+			VipsPel *p = VIPS_REGION_ADDR(out_region, 0, r->top);
+
+			for (i = 0; i < ne; i++) {
+				/* Interleaved data is big endian, convert to
+				 * native.
+				 */
+				guint16 v = ((p[0] << 8) | p[1]) << shift;
+
+				*((guint16 *) p) = v;
+				p += 2;
+			}
 		}
 	}
 
