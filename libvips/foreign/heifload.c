@@ -578,9 +578,7 @@ vips_foreign_load_heif_set_header(VipsForeignLoadHeif *heif, VipsImage *out)
 
 	int bands;
 	int i;
-	/* Surely, 16 metadata items will be enough for anyone.
-	 */
-	heif_item_id id[16];
+	heif_item_id *id;
 	int n_metadata;
 	struct heif_error error;
 	VipsForeignHeifCompression compression;
@@ -619,8 +617,16 @@ vips_foreign_load_heif_set_header(VipsForeignLoadHeif *heif, VipsImage *out)
 
 	/* FIXME .. IPTC as well?
 	 */
-	n_metadata = heif_image_handle_get_list_of_metadata_block_IDs(
-		heif->handle, NULL, id, VIPS_NUMBER(id));
+	n_metadata = heif_image_handle_get_number_of_metadata_blocks(
+		heif->handle, NULL);
+	if (n_metadata > 0) {
+		if (!(id = VIPS_ARRAY(NULL, n_metadata, heif_item_id)))
+			return -1;
+		heif_image_handle_get_list_of_metadata_block_IDs(
+			heif->handle, NULL, id, n_metadata);
+	}
+	else
+		id = NULL;
 	for (i = 0; i < n_metadata; i++) {
 		size_t length =
 			heif_image_handle_get_metadata_size(heif->handle, id[i]);
@@ -638,11 +644,14 @@ vips_foreign_load_heif_set_header(VipsForeignLoadHeif *heif, VipsImage *out)
 
 		if (!length)
 			continue;
-		if (!(data = VIPS_ARRAY(NULL, length, unsigned char)))
+		if (!(data = VIPS_ARRAY(NULL, length, unsigned char))) {
+			VIPS_FREE(id);
 			return -1;
+		}
 		error = heif_image_handle_get_metadata(heif->handle, id[i], data);
 		if (error.code) {
 			VIPS_FREE(data);
+			VIPS_FREE(id);
 			vips__heif_error(&error);
 			return -1;
 		}
@@ -673,6 +682,7 @@ vips_foreign_load_heif_set_header(VipsForeignLoadHeif *heif, VipsImage *out)
 		/* image_set will automatically parse EXIF, if necessary.
 		 */
 	}
+	VIPS_FREE(id);
 
 	/* We use libheif's autorotate, so we need to remove any EXIF
 	 * orientation tags.
