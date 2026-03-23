@@ -761,6 +761,64 @@ vips_foreign_load_heif_set_header(VipsForeignLoadHeif *heif, VipsImage *out)
 		}
 	}
 
+	/* Extract HDR metadata if available.
+	 */
+#ifdef HAVE_HEIF_CONTENT_LIGHT_LEVEL
+	{
+		heif_content_light_level cll;
+
+		if (heif_image_handle_get_content_light_level(
+				heif->handle, &cll)) {
+			vips_image_set_int(out,
+				"heif-cll-max-content-light-level",
+				cll.max_content_light_level);
+			vips_image_set_int(out,
+				"heif-cll-max-pic-average-light-level",
+				cll.max_pic_average_light_level);
+		}
+	}
+#endif /*HAVE_HEIF_CONTENT_LIGHT_LEVEL*/
+
+#ifdef HAVE_HEIF_MASTERING_DISPLAY_COLOUR_VOLUME
+	{
+		heif_mastering_display_colour_volume mdcv;
+
+		if (heif_image_handle_get_mastering_display_colour_volume(
+				heif->handle, &mdcv)) {
+			vips_image_set_int(out,
+				"heif-mdcv-display-primaries-x-0",
+				mdcv.display_primaries_x[0]);
+			vips_image_set_int(out,
+				"heif-mdcv-display-primaries-y-0",
+				mdcv.display_primaries_y[0]);
+			vips_image_set_int(out,
+				"heif-mdcv-display-primaries-x-1",
+				mdcv.display_primaries_x[1]);
+			vips_image_set_int(out,
+				"heif-mdcv-display-primaries-y-1",
+				mdcv.display_primaries_y[1]);
+			vips_image_set_int(out,
+				"heif-mdcv-display-primaries-x-2",
+				mdcv.display_primaries_x[2]);
+			vips_image_set_int(out,
+				"heif-mdcv-display-primaries-y-2",
+				mdcv.display_primaries_y[2]);
+			vips_image_set_int(out,
+				"heif-mdcv-white-point-x",
+				mdcv.white_point_x);
+			vips_image_set_int(out,
+				"heif-mdcv-white-point-y",
+				mdcv.white_point_y);
+			vips_image_set_int(out,
+				"heif-mdcv-max-luminance",
+				mdcv.max_display_mastering_luminance);
+			vips_image_set_int(out,
+				"heif-mdcv-min-luminance",
+				mdcv.min_display_mastering_luminance);
+		}
+	}
+#endif /*HAVE_HEIF_MASTERING_DISPLAY_COLOUR_VOLUME*/
+
 	vips_image_set_int(out, "heif-primary", heif->primary_page);
 	vips_image_set_int(out, VIPS_META_N_PAGES, heif->n_top);
 
