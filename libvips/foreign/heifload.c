@@ -732,7 +732,24 @@ vips_foreign_load_heif_set_header(VipsForeignLoadHeif *heif, VipsImage *out)
 			(VipsCallbackFn) vips_area_free_cb, data, length);
 	}
 	else if (profile_type == heif_color_profile_type_nclx) {
-		g_info("heifload: ignoring nclx profile");
+		struct heif_color_profile_nclx *nclx = NULL;
+
+		error = heif_image_handle_get_nclx_color_profile(
+			heif->handle, &nclx);
+		if (error.code) {
+			g_info("heifload: unable to read nclx profile");
+		}
+		else {
+			vips_image_set_int(out, "heif-color-primaries",
+				nclx->color_primaries);
+			vips_image_set_int(out, "heif-transfer-characteristics",
+				nclx->transfer_characteristics);
+			vips_image_set_int(out, "heif-matrix-coefficients",
+				nclx->matrix_coefficients);
+			vips_image_set_int(out, "heif-full-range-flag",
+				nclx->full_range_flag);
+			heif_nclx_color_profile_free(nclx);
+		}
 	}
 
 	vips_image_set_int(out, "heif-primary", heif->primary_page);
