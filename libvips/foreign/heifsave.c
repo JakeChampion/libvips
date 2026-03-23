@@ -313,6 +313,38 @@ vips_foreign_save_heif_write_page(VipsForeignSaveHeif *heif, int page)
 		 */
 		options->macOS_compatibility_workaround_no_nclx_profile = 0;
 	}
+	else if (!save->profile &&
+		!vips_image_get_typeof(save->ready, VIPS_META_ICC_NAME) &&
+		vips_image_get_typeof(save->ready, "heif-color-primaries")) {
+		/* Round-trip NCLX metadata from load. Only write NCLX when
+		 * there is no ICC profile, since ICC takes priority.
+		 */
+		int cp, tc, mc, fr;
+
+		if (vips_image_get_int(save->ready,
+				"heif-color-primaries", &cp) ||
+			vips_image_get_int(save->ready,
+				"heif-transfer-characteristics", &tc) ||
+			vips_image_get_int(save->ready,
+				"heif-matrix-coefficients", &mc) ||
+			vips_image_get_int(save->ready,
+				"heif-full-range-flag", &fr)) {
+			heif_encoding_options_free(options);
+			return -1;
+		}
+
+		if (!(nclx = heif_nclx_color_profile_alloc())) {
+			heif_encoding_options_free(options);
+			return -1;
+		}
+
+		heif_nclx_color_profile_set_color_primaries(nclx, cp);
+		heif_nclx_color_profile_set_transfer_characteristics(nclx, tc);
+		heif_nclx_color_profile_set_matrix_coefficients(nclx, mc);
+		nclx->full_range_flag = fr;
+		options->output_nclx_profile = nclx;
+		options->macOS_compatibility_workaround_no_nclx_profile = 0;
+	}
 #endif /*HAVE_HEIF_ENCODING_OPTIONS_OUTPUT_NCLX_PROFILE*/
 
 #ifdef HAVE_HEIF_ENCODING_OPTIONS_IMAGE_ORIENTATION
