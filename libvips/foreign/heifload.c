@@ -486,15 +486,24 @@ vips_foreign_load_heif_set_thumbnail(VipsForeignLoadHeif *heif)
 		return -1;
 	}
 
-	thumb_aspect = (double)
-		heif_image_get_width(thumb_img, heif_channel_interleaved) /
-		heif_image_get_height(thumb_img, heif_channel_interleaved);
+	{
+		int thumb_width =
+			heif_image_get_width(thumb_img, heif_channel_interleaved);
+		int thumb_height =
+			heif_image_get_height(thumb_img, heif_channel_interleaved);
+		int main_width = heif_image_handle_get_width(heif->handle);
+		int main_height = heif_image_handle_get_height(heif->handle);
 
-	VIPS_FREEF(heif_image_release, thumb_img);
+		VIPS_FREEF(heif_image_release, thumb_img);
 
-	main_aspect = (double)
-		heif_image_handle_get_width(heif->handle) /
-		heif_image_handle_get_height(heif->handle);
+		if (thumb_height <= 0 || main_height <= 0) {
+			VIPS_FREEF(heif_image_handle_release, thumb_handle);
+			return 0;
+		}
+
+		thumb_aspect = (double) thumb_width / thumb_height;
+		main_aspect = (double) main_width / main_height;
+	}
 
 	/* The bug we are working around has decoded thumbs as 512x512
 	 * with the main image as 6kx4k, so a 0.1 threshold is more
