@@ -88,11 +88,10 @@
 #warning DEBUG on in libsrc/iofuncs/memory.c
 #endif /*DEBUG*/
 
-static int vips_tracked_allocs = 0;
-static size_t vips_tracked_mem = 0;
-static int vips_tracked_files = 0;
-static size_t vips_tracked_mem_highwater = 0;
-static GMutex vips_tracked_mutex;
+static volatile int vips_tracked_allocs = 0;
+static volatile size_t vips_tracked_mem = 0;
+static volatile int vips_tracked_files = 0;
+static volatile size_t vips_tracked_mem_highwater = 0;
 
 /**
  * VIPS_NEW:
@@ -220,21 +219,23 @@ vips_tracked_free(void *s)
 	void *start = (void *) ((char *) s - 16);
 	size_t size = *((size_t *) start);
 
-	g_mutex_lock(&vips_tracked_mutex);
+	{
+		int old_allocs;
+		size_t old_mem;
 
 #ifdef DEBUG_VERBOSE_MEM
-	printf("vips_tracked_free: %p, %zd bytes\n", s, size);
+		printf("vips_tracked_free: %p, %zd bytes\n", s, size);
 #endif /*DEBUG_VERBOSE_MEM*/
 
-	if (vips_tracked_allocs <= 0)
-		g_warning("vips_free: too many frees");
-	if (vips_tracked_mem < size)
-		g_warning("vips_free: too much free");
+		old_allocs = g_atomic_int_add(&vips_tracked_allocs, -1);
+		if (old_allocs <= 0)
+			g_warning("vips_free: too many frees");
 
-	vips_tracked_mem -= size;
-	vips_tracked_allocs -= 1;
-
-	g_mutex_unlock(&vips_tracked_mutex);
+		old_mem = __atomic_fetch_sub(&vips_tracked_mem, size,
+			__ATOMIC_RELAXED);
+		if (old_mem < size)
+			g_warning("vips_free: too much free");
+	}
 
 	g_free(start);
 
@@ -258,21 +259,23 @@ vips_tracked_aligned_free(void *s)
 	void *start = (size_t *) s - 1;
 	size_t size = *((size_t *) start);
 
-	g_mutex_lock(&vips_tracked_mutex);
+	{
+		int old_allocs;
+		size_t old_mem;
 
 #ifdef DEBUG_VERBOSE
-	printf("vips_tracked_aligned_free: %p, %zd bytes\n", s, size);
+		printf("vips_tracked_aligned_free: %p, %zd bytes\n", s, size);
 #endif /*DEBUG_VERBOSE*/
 
-	if (vips_tracked_allocs <= 0)
-		g_warning("vips_free: too many frees");
-	if (vips_tracked_mem < size)
-		g_warning("vips_free: too much free");
+		old_allocs = g_atomic_int_add(&vips_tracked_allocs, -1);
+		if (old_allocs <= 0)
+			g_warning("vips_free: too many frees");
 
-	vips_tracked_mem -= size;
-	vips_tracked_allocs -= 1;
-
-	g_mutex_unlock(&vips_tracked_mutex);
+		old_mem = __atomic_fetch_sub(&vips_tracked_mem, size,
+			__ATOMIC_RELAXED);
+		if (old_mem < size)
+			g_warning("vips_free: too much free");
+	}
 
 #ifdef HAVE__ALIGNED_MALLOC
 	_aligned_free(start);
@@ -325,21 +328,34 @@ vips_tracked_malloc(size_t size)
 		return NULL;
 	}
 
-	g_mutex_lock(&vips_tracked_mutex);
-
 	*((size_t *) buf) = size;
 	buf = (void *) ((char *) buf + 16);
 
-	vips_tracked_mem += size;
-	if (vips_tracked_mem > vips_tracked_mem_highwater)
-		vips_tracked_mem_highwater = vips_tracked_mem;
-	vips_tracked_allocs += 1;
+	{
+		size_t new_mem;
+		size_t old_hw;
+
+		new_mem = __atomic_add_fetch(&vips_tracked_mem, size,
+			__ATOMIC_RELAXED);
+
+		/* Update highwater mark with a CAS loop.
+		 */
+		old_hw = __atomic_load_n(&vips_tracked_mem_highwater,
+			__ATOMIC_RELAXED);
+		while (new_mem > old_hw)
+			if (__atomic_compare_exchange_n(
+					&vips_tracked_mem_highwater,
+					&old_hw, new_mem,
+					1, __ATOMIC_RELAXED,
+					__ATOMIC_RELAXED))
+				break;
+
+		g_atomic_int_inc(&vips_tracked_allocs);
 
 #ifdef DEBUG_VERBOSE_MEM
-	printf("vips_tracked_malloc: %p, %zd bytes\n", buf, size);
+		printf("vips_tracked_malloc: %p, %zd bytes\n", buf, size);
 #endif /*DEBUG_VERBOSE_MEM*/
-
-	g_mutex_unlock(&vips_tracked_mutex);
+	}
 
 	VIPS_GATE_MALLOC(size);
 
@@ -401,20 +417,32 @@ vips_tracked_aligned_alloc(size_t size, size_t align)
 
 	memset(buf, 0, size);
 
-	g_mutex_lock(&vips_tracked_mutex);
-
 	*((size_t *) buf) = size;
 
-	vips_tracked_mem += size;
-	if (vips_tracked_mem > vips_tracked_mem_highwater)
-		vips_tracked_mem_highwater = vips_tracked_mem;
-	vips_tracked_allocs += 1;
+	{
+		size_t new_mem;
+		size_t old_hw;
+
+		new_mem = __atomic_add_fetch(&vips_tracked_mem, size,
+			__ATOMIC_RELAXED);
+
+		old_hw = __atomic_load_n(&vips_tracked_mem_highwater,
+			__ATOMIC_RELAXED);
+		while (new_mem > old_hw)
+			if (__atomic_compare_exchange_n(
+					&vips_tracked_mem_highwater,
+					&old_hw, new_mem,
+					1, __ATOMIC_RELAXED,
+					__ATOMIC_RELAXED))
+				break;
+
+		g_atomic_int_inc(&vips_tracked_allocs);
 
 #ifdef DEBUG_VERBOSE
-	printf("vips_tracked_aligned_alloc: %p, %zd bytes\n", buf, size);
+		printf("vips_tracked_aligned_alloc: %p, %zd bytes\n",
+			buf, size);
 #endif /*DEBUG_VERBOSE*/
-
-	g_mutex_unlock(&vips_tracked_mutex);
+	}
 
 	VIPS_GATE_MALLOC(size);
 
@@ -449,15 +477,12 @@ vips_tracked_open(const char *pathname, int flags, int mode)
 	if ((fd = vips__open(pathname, flags, mode)) == -1)
 		return -1;
 
-	g_mutex_lock(&vips_tracked_mutex);
+	g_atomic_int_inc(&vips_tracked_files);
 
-	vips_tracked_files += 1;
 #ifdef DEBUG_VERBOSE_FD
 	printf("vips_tracked_open: %s = %d (%d)\n",
-		pathname, fd, vips_tracked_files);
+		pathname, fd, g_atomic_int_get(&vips_tracked_files));
 #endif /*DEBUG_VERBOSE_FD*/
-
-	g_mutex_unlock(&vips_tracked_mutex);
 
 	return fd;
 }
@@ -483,20 +508,18 @@ vips_tracked_close(int fd)
 {
 	int result;
 
-	g_mutex_lock(&vips_tracked_mutex);
-
 	/* libvips uses fd -1 to mean invalid descriptor.
 	 */
 	g_assert(fd != -1);
-	g_assert(vips_tracked_files > 0);
+	g_assert(g_atomic_int_get(&vips_tracked_files) > 0);
 
-	vips_tracked_files -= 1;
+	g_atomic_int_add(&vips_tracked_files, -1);
+
 #ifdef DEBUG_VERBOSE_FD
-	printf("vips_tracked_close: %d (%d)\n", fd, vips_tracked_files);
+	printf("vips_tracked_close: %d (%d)\n", fd,
+		g_atomic_int_get(&vips_tracked_files));
 	printf("   from thread %p\n", g_thread_self());
 #endif /*DEBUG_VERBOSE_FD*/
-
-	g_mutex_unlock(&vips_tracked_mutex);
 
 	result = close(fd);
 
@@ -515,15 +538,7 @@ vips_tracked_close(int fd)
 size_t
 vips_tracked_get_mem(void)
 {
-	size_t mem;
-
-	g_mutex_lock(&vips_tracked_mutex);
-
-	mem = vips_tracked_mem;
-
-	g_mutex_unlock(&vips_tracked_mutex);
-
-	return mem;
+	return __atomic_load_n(&vips_tracked_mem, __ATOMIC_RELAXED);
 }
 
 /**
@@ -538,15 +553,7 @@ vips_tracked_get_mem(void)
 size_t
 vips_tracked_get_mem_highwater(void)
 {
-	size_t mx;
-
-	g_mutex_lock(&vips_tracked_mutex);
-
-	mx = vips_tracked_mem_highwater;
-
-	g_mutex_unlock(&vips_tracked_mutex);
-
-	return mx;
+	return __atomic_load_n(&vips_tracked_mem_highwater, __ATOMIC_RELAXED);
 }
 
 /**
@@ -559,15 +566,7 @@ vips_tracked_get_mem_highwater(void)
 int
 vips_tracked_get_allocs(void)
 {
-	int n;
-
-	g_mutex_lock(&vips_tracked_mutex);
-
-	n = vips_tracked_allocs;
-
-	g_mutex_unlock(&vips_tracked_mutex);
-
-	return n;
+	return g_atomic_int_get(&vips_tracked_allocs);
 }
 
 /**
@@ -580,13 +579,5 @@ vips_tracked_get_allocs(void)
 int
 vips_tracked_get_files(void)
 {
-	int n;
-
-	g_mutex_lock(&vips_tracked_mutex);
-
-	n = vips_tracked_files;
-
-	g_mutex_unlock(&vips_tracked_mutex);
-
-	return n;
+	return g_atomic_int_get(&vips_tracked_files);
 }
