@@ -565,12 +565,17 @@ read_header(Read *read, VipsImage *out)
 		}
 	}
 
-	/* The canvas is always RGBA, we drop alpha to RGB on output if we
-	 * can.
+	/* For static images without alpha, decode directly to RGB -- this
+	 * avoids 33% extra memory and the per-pixel alpha stripping loop.
+	 * Animated images always need RGBA for frame blending.
 	 */
+	if (!(flags & ANIMATION_FLAG) && !read->alpha)
+		read->config.output.colorspace = MODE_RGB;
+
 	read->frame = vips_image_new_memory();
 	vips_image_init_fields(read->frame,
-		read->frame_width, read->frame_height, 4,
+		read->frame_width, read->frame_height,
+		read->config.output.colorspace == MODE_RGBA ? 4 : 3,
 		VIPS_FORMAT_UCHAR, VIPS_CODING_NONE,
 		VIPS_INTERPRETATION_sRGB,
 		1.0, 1.0);
@@ -614,7 +619,8 @@ read_frame(Read *read,
 
 	frame = vips_image_new_memory();
 	vips_image_init_fields(frame,
-		width, height, 4,
+		width, height,
+		read->config.output.colorspace == MODE_RGBA ? 4 : 3,
 		VIPS_FORMAT_UCHAR, VIPS_CODING_NONE,
 		VIPS_INTERPRETATION_sRGB,
 		1.0, 1.0);
@@ -754,7 +760,9 @@ read_webp_generate(VipsRegion *out_region,
 		read->frame_no += 1;
 	}
 
-	if (out_region->im->Bands == 4)
+	if (out_region->im->Bands == read->frame->Bands)
+		/* Frame and output have the same pixel size -- direct copy.
+		 */
 		memcpy(VIPS_REGION_ADDR(out_region, 0, r->top),
 			VIPS_IMAGE_ADDR(read->frame, 0, line),
 			VIPS_IMAGE_SIZEOF_LINE(read->frame));
@@ -763,8 +771,8 @@ read_webp_generate(VipsRegion *out_region,
 		VipsPel *p;
 		VipsPel *q;
 
-		/* We know that alpha is solid, so we can just drop the 4th
-		 * band.
+		/* Frame is RGBA, output is RGB. We know that alpha is
+		 * solid, so we can just drop the 4th band.
 		 */
 		p = VIPS_IMAGE_ADDR(read->frame, 0, line);
 		q = VIPS_REGION_ADDR(out_region, 0, r->top);
