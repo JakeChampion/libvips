@@ -289,6 +289,11 @@ vips_foreign_save_heif_write_page(VipsForeignSaveHeif *heif, int page)
 	}
 
 	options = heif_encoding_options_alloc();
+	if (!options) {
+		vips_error("heifsave", "%s",
+			_("unable to allocate encoding options"));
+		return -1;
+	}
 	options->save_alpha_channel = save->ready->Bands > 3;
 
 #ifdef HAVE_HEIF_ENCODING_OPTIONS_OUTPUT_NCLX_PROFILE
@@ -515,6 +520,12 @@ vips_foreign_save_heif_build(VipsObject *object)
 	const struct heif_encoder_parameter *const *param;
 #endif
 	gboolean has_alpha;
+
+	if (!heif->ctx) {
+		vips_error("heifsave", "%s",
+			_("unable to allocate heif context"));
+		return -1;
+	}
 
 	if (VIPS_OBJECT_CLASS(vips_foreign_save_heif_parent_class)->build(object))
 		return -1;

@@ -833,7 +833,8 @@ vips_foreign_load_heif_header(VipsForeignLoad *load)
 #endif /*DEBUG*/
 
 	heif->n_top = heif_context_get_number_of_top_level_images(heif->ctx);
-	heif->id = VIPS_ARRAY(NULL, heif->n_top, heif_item_id);
+	if (!(heif->id = VIPS_ARRAY(NULL, heif->n_top, heif_item_id)))
+		return -1;
 	heif_context_get_list_of_top_level_image_IDs(heif->ctx,
 		heif->id, heif->n_top);
 
