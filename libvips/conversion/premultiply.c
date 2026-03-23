@@ -124,6 +124,73 @@ G_DEFINE_TYPE(VipsPremultiply, vips_premultiply, VIPS_TYPE_CONVERSION);
 		} \
 	}
 
+/* Fast path for UCHAR: precompute a 256-entry LUT to replace per-pixel
+ * float division with a table lookup.
+ */
+static int
+vips_premultiply_gen_uchar(VipsRegion *out_region,
+	void *vseq, void *a, void *b, gboolean *stop)
+{
+	VipsPremultiply *premultiply = (VipsPremultiply *) b;
+	VipsRegion *ir = (VipsRegion *) vseq;
+	VipsImage *im = ir->im;
+	VipsRect *r = &out_region->valid;
+	int width = r->width;
+	int bands = im->Bands;
+	double max_alpha = premultiply->max_alpha;
+
+	int x, y, i;
+
+	/* Build LUT: nalpha_lut[a] = clip(a, 0, max_alpha) / max_alpha.
+	 * Only 256 entries, fits in L1 cache.
+	 */
+	float nalpha_lut[256];
+	for (i = 0; i < 256; i++) {
+		double clip = VIPS_CLIP(0, i, max_alpha);
+		nalpha_lut[i] = (float) (clip / max_alpha);
+	}
+
+	if (vips_region_prepare(ir, r))
+		return -1;
+
+	for (y = 0; y < r->height; y++) {
+		unsigned char *restrict p =
+			(unsigned char *) VIPS_REGION_ADDR(ir, r->left,
+				r->top + y);
+		float *restrict q =
+			(float *) VIPS_REGION_ADDR(out_region, r->left,
+				r->top + y);
+
+		if (bands == 4) {
+			for (x = 0; x < width; x++) {
+				float nalpha = nalpha_lut[p[3]];
+
+				q[0] = p[0] * nalpha;
+				q[1] = p[1] * nalpha;
+				q[2] = p[2] * nalpha;
+				q[3] = p[3];
+
+				p += 4;
+				q += 4;
+			}
+		}
+		else {
+			for (x = 0; x < width; x++) {
+				float nalpha = nalpha_lut[p[bands - 1]];
+
+				for (i = 0; i < bands - 1; i++)
+					q[i] = p[i] * nalpha;
+				q[i] = p[bands - 1];
+
+				p += bands;
+				q += bands;
+			}
+		}
+	}
+
+	return 0;
+}
+
 VIPS_TARGET_CLONES("default,avx")
 static int
 vips_premultiply_gen(VipsRegion *out_region,
@@ -232,7 +299,11 @@ vips_premultiply_build(VipsObject *object)
 		conversion->out->BandFmt = VIPS_FORMAT_FLOAT;
 
 	if (vips_image_generate(conversion->out,
-			vips_start_one, vips_premultiply_gen, vips_stop_one,
+			vips_start_one,
+			in->BandFmt == VIPS_FORMAT_UCHAR
+				? vips_premultiply_gen_uchar
+				: vips_premultiply_gen,
+			vips_stop_one,
 			in, premultiply))
 		return -1;
 
