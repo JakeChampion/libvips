@@ -476,7 +476,7 @@ make_firstlast(MergeInfo *inf, Overlapping *ovlap, VipsRect *oreg)
 						tq[i] = tr[i]; \
 				else \
 					for (b = 0; b < cb; b++, i++) \
-						tq[i] = tr[i]; \
+						tq[i] = ts[i]; \
 			/* To the right? \
 			 */ \
 			else if (y >= last[x]) \
