@@ -175,6 +175,7 @@ typedef struct {
 	int divisor;
 	int rounding;
 	int offset;
+	guint64 divisor_recip;
 
 	/* The horizontal lines we gather. hline[3] writes to band 3 in the
 	 * intermediate image. max_line is the length of the longest hline:
@@ -749,6 +750,9 @@ vips_conva_decompose_boxes(VipsConva *conva)
 	conva->divisor = VIPS_MAX(1, rint(area * scale / sum));
 	conva->rounding = (conva->divisor + 1) / 2;
 	conva->offset = offset;
+	conva->divisor_recip = conva->divisor > 0
+		? ((1ULL << 32) + conva->divisor - 1) / conva->divisor
+		: 0;
 
 #ifdef DEBUG
 	vips_conva_hprint(conva);
@@ -1064,6 +1068,53 @@ vips_conva_horizontal(VipsConva *conva, VipsImage *in, VipsImage **out)
 	{ \
 	}
 
+#define VCONV_UINT(ACC, IN, OUT, CLIP) \
+	G_STMT_START \
+	{ \
+		for (x = 0; x < sz; x++) { \
+			ACC *seq_sum = (ACC *) seq->sum; \
+\
+			IN *p; \
+			OUT *q; \
+			ACC sum; \
+\
+			p = x * conva->n_hline + \
+				(IN *) VIPS_REGION_ADDR(ir, r->left, r->top); \
+			q = x + (OUT *) VIPS_REGION_ADDR(out_region, r->left, r->top); \
+\
+			sum = 0; \
+			for (z = 0; z < n_vline; z++) { \
+				seq_sum[z] = 0; \
+				for (k = conva->vline[z].start; \
+					 k < conva->vline[z].end; k++) \
+					seq_sum[z] += p[k * istride + conva->vline[z].band]; \
+				sum += conva->vline[z].factor * seq_sum[z]; \
+			} \
+			sum = (ACC) (((guint64) (sum + conva->rounding) * \
+				conva->divisor_recip) >> 32) + conva->offset; \
+			CLIP(sum); \
+			*q = sum; \
+			q += ostride; \
+\
+			for (y = 1; y < r->height; y++) { \
+				sum = 0; \
+				for (z = 0; z < n_vline; z++) { \
+					seq_sum[z] += p[seq->end[z]]; \
+					seq_sum[z] -= p[seq->start[z]]; \
+					sum += conva->vline[z].factor * seq_sum[z]; \
+				} \
+				p += istride; \
+				sum = (ACC) (((guint64) (sum + conva->rounding) * \
+					conva->divisor_recip) >> 32) + \
+					conva->offset; \
+				CLIP(sum); \
+				*q = sum; \
+				q += ostride; \
+			} \
+		} \
+	} \
+	G_STMT_END
+
 #define VCONV(ACC, IN, OUT, CLIP) \
 	G_STMT_START \
 	{ \
@@ -1165,9 +1216,9 @@ vips_conva_vgenerate(VipsRegion *out_region,
 	switch (convolution->in->BandFmt) {
 	case VIPS_FORMAT_UCHAR:
 		if (conva->max_line < 256)
-			VCONV(unsigned int, unsigned short, unsigned char, CLIP_UCHAR);
+			VCONV_UINT(unsigned int, unsigned short, unsigned char, CLIP_UCHAR);
 		else
-			VCONV(unsigned int, unsigned int, unsigned char, CLIP_UCHAR);
+			VCONV_UINT(unsigned int, unsigned int, unsigned char, CLIP_UCHAR);
 		break;
 
 	case VIPS_FORMAT_CHAR:
@@ -1179,9 +1230,9 @@ vips_conva_vgenerate(VipsRegion *out_region,
 
 	case VIPS_FORMAT_USHORT:
 		if (conva->max_line < 256)
-			VCONV(unsigned int, unsigned short, unsigned short, CLIP_USHORT);
+			VCONV_UINT(unsigned int, unsigned short, unsigned short, CLIP_USHORT);
 		else
-			VCONV(unsigned int, unsigned int, unsigned short, CLIP_USHORT);
+			VCONV_UINT(unsigned int, unsigned int, unsigned short, CLIP_USHORT);
 		break;
 
 	case VIPS_FORMAT_SHORT:

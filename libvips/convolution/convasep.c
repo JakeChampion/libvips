@@ -112,6 +112,7 @@ typedef struct {
 	int divisor;
 	int rounding;
 	int offset;
+	guint64 divisor_recip;
 
 	/* The "width" of the mask, ie. n for our 1xn or nx1 argument, plus
 	 * an int version of our mask.
@@ -305,6 +306,9 @@ vips_convasep_decompose(VipsConvasep *convasep)
 	convasep->divisor = VIPS_MAX(1, rint(sum * area / scale));
 	convasep->rounding = (convasep->divisor + 1) / 2;
 	convasep->offset = offset;
+	convasep->divisor_recip = convasep->divisor > 0
+		? ((1ULL << 32) + convasep->divisor - 1) / convasep->divisor
+		: 0;
 
 #ifdef DEBUG
 	/* ASCII-art layer drawing.
@@ -492,6 +496,49 @@ vips_convasep_start(VipsImage *out, void *a, void *b)
 		} \
 	}
 
+#define HCONV_UINT(ACC, TYPE, CLIP) \
+	{ \
+		for (i = 0; i < bands; i++) { \
+			ACC *isum = (ACC *) seq->sum; \
+\
+			TYPE *q; \
+			TYPE *p; \
+			ACC sum; \
+\
+			p = i + (TYPE *) VIPS_REGION_ADDR(ir, r->left, r->top + y); \
+			q = i + (TYPE *) VIPS_REGION_ADDR(out_region, r->left, r->top + y); \
+\
+			sum = 0; \
+			for (z = 0; z < n_lines; z++) { \
+				isum[z] = 0; \
+				for (x = seq->start[z]; x < seq->end[z]; x += istride) \
+					isum[z] += p[x]; \
+				sum += convasep->factor[z] * isum[z]; \
+			} \
+\
+			sum = (ACC) (((guint64) (sum + convasep->rounding) * \
+				convasep->divisor_recip) >> 32); \
+			CLIP(sum); \
+			*q = sum; \
+			q += ostride; \
+\
+			for (x = 1; x < r->width; x++) { \
+				sum = 0; \
+				for (z = 0; z < n_lines; z++) { \
+					isum[z] += p[seq->end[z]]; \
+					isum[z] -= p[seq->start[z]]; \
+					sum += convasep->factor[z] * isum[z]; \
+				} \
+				p += istride; \
+				sum = (ACC) (((guint64) (sum + convasep->rounding) * \
+					convasep->divisor_recip) >> 32); \
+				CLIP(sum); \
+				*q = sum; \
+				q += ostride; \
+			} \
+		} \
+	}
+
 #define HCONV_FLOAT(TYPE) \
 	{ \
 		for (i = 0; i < bands; i++) { \
@@ -590,7 +637,7 @@ vips_convasep_generate_horizontal(VipsRegion *out_region,
 	for (y = 0; y < r->height; y++) {
 		switch (in->BandFmt) {
 		case VIPS_FORMAT_UCHAR:
-			HCONV_INT(unsigned int, unsigned char, CLIP_UCHAR);
+			HCONV_UINT(unsigned int, unsigned char, CLIP_UCHAR);
 			break;
 
 		case VIPS_FORMAT_CHAR:
@@ -598,7 +645,7 @@ vips_convasep_generate_horizontal(VipsRegion *out_region,
 			break;
 
 		case VIPS_FORMAT_USHORT:
-			HCONV_INT(unsigned int, unsigned short, CLIP_USHORT);
+			HCONV_UINT(unsigned int, unsigned short, CLIP_USHORT);
 			break;
 
 		case VIPS_FORMAT_SHORT:
@@ -665,6 +712,50 @@ vips_convasep_generate_horizontal(VipsRegion *out_region,
 				} \
 				p += istride; \
 				sum = (sum + convasep->rounding) / convasep->divisor + \
+					convasep->offset; \
+				CLIP(sum); \
+				*q = sum; \
+				q += ostride; \
+			} \
+		} \
+	}
+
+#define VCONV_UINT(ACC, TYPE, CLIP) \
+	{ \
+		for (x = 0; x < sz; x++) { \
+			ACC *isum = (ACC *) seq->sum; \
+\
+			TYPE *q; \
+			TYPE *p; \
+			ACC sum; \
+\
+			p = x + (TYPE *) VIPS_REGION_ADDR(ir, r->left, r->top); \
+			q = x + (TYPE *) VIPS_REGION_ADDR(out_region, r->left, r->top); \
+\
+			sum = 0; \
+			for (z = 0; z < n_lines; z++) { \
+				isum[z] = 0; \
+				for (y = seq->start[z]; y < seq->end[z]; y += istride) \
+					isum[z] += p[y]; \
+				sum += convasep->factor[z] * isum[z]; \
+			} \
+			sum = (ACC) (((guint64) (sum + convasep->rounding) * \
+				convasep->divisor_recip) >> 32) + \
+				convasep->offset; \
+			CLIP(sum); \
+			*q = sum; \
+			q += ostride; \
+\
+			for (y = 1; y < r->height; y++) { \
+				sum = 0; \
+				for (z = 0; z < n_lines; z++) { \
+					isum[z] += p[seq->end[z]]; \
+					isum[z] -= p[seq->start[z]]; \
+					sum += convasep->factor[z] * isum[z]; \
+				} \
+				p += istride; \
+				sum = (ACC) (((guint64) (sum + convasep->rounding) * \
+					convasep->divisor_recip) >> 32) + \
 					convasep->offset; \
 				CLIP(sum); \
 				*q = sum; \
@@ -766,7 +857,7 @@ vips_convasep_generate_vertical(VipsRegion *out_region,
 
 	switch (in->BandFmt) {
 	case VIPS_FORMAT_UCHAR:
-		VCONV_INT(unsigned int, unsigned char, CLIP_UCHAR);
+		VCONV_UINT(unsigned int, unsigned char, CLIP_UCHAR);
 		break;
 
 	case VIPS_FORMAT_CHAR:
@@ -774,7 +865,7 @@ vips_convasep_generate_vertical(VipsRegion *out_region,
 		break;
 
 	case VIPS_FORMAT_USHORT:
-		VCONV_INT(unsigned int, unsigned short, CLIP_USHORT);
+		VCONV_UINT(unsigned int, unsigned short, CLIP_USHORT);
 		break;
 
 	case VIPS_FORMAT_SHORT:
