@@ -849,9 +849,9 @@ decode_lab(guint16 *fixed, float *lab, int n)
 	for (i = 0; i < n; i++) {
 		/* cmsLabEncoded2Float inlined.
 		 */
-		lab[0] = (double) fixed[0] / 655.35;
-		lab[1] = ((double) fixed[1] / 257.0) - 128.0;
-		lab[2] = ((double) fixed[2] / 257.0) - 128.0;
+		lab[0] = fixed[0] * (1.0F / 655.35F);
+		lab[1] = fixed[1] * (1.0F / 257.0F) - 128.0F;
+		lab[2] = fixed[2] * (1.0F / 257.0F) - 128.0F;
 
 		lab += 3;
 		fixed += 3;
@@ -871,9 +871,9 @@ decode_xyz(guint16 *fixed, float *xyz, int n)
 	for (i = 0; i < n; i++) {
 		/* cmsXYZEncoded2Float inlined.
 		 */
-		float X = fixed[0] / 32768.0;
-		float Y = fixed[1] / 32768.0;
-		float Z = fixed[2] / 32768.0;
+		float X = fixed[0] * (1.0F / 32768.0F);
+		float Y = fixed[1] * (1.0F / 32768.0F);
+		float Z = fixed[2] * (1.0F / 32768.0F);
 
 		X *= SCALE;
 		Y *= SCALE;

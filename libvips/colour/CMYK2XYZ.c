@@ -150,10 +150,10 @@ vips_CMYK2XYZ_line(VipsColour *colour, VipsPel *out, VipsPel **in, int width)
 	int i;
 
 	for (i = 0; i < width; i++) {
-		float c = p[0] / 255.0;
-		float m = p[1] / 255.0;
-		float y = p[2] / 255.0;
-		float k = p[3] / 255.0;
+		float c = p[0] * (1.0F / 255.0F);
+		float m = p[1] * (1.0F / 255.0F);
+		float y = p[2] * (1.0F / 255.0F);
+		float k = p[3] * (1.0F / 255.0F);
 
 		float r = 1.0 - (c * (1.0 - k) + k);
 		float g = 1.0 - (m * (1.0 - k) + k);

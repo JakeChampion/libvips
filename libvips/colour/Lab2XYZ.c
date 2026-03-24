@@ -74,6 +74,11 @@ typedef struct _VipsLab2XYZ {
 	double Y0;
 	double Z0;
 
+	/* Precomputed reciprocals for per-pixel division.
+	 */
+	float Y0_div_903_3;
+	float inv_Y0;
+
 } VipsLab2XYZ;
 
 typedef VipsColourTransformClass VipsLab2XYZClass;
@@ -87,8 +92,8 @@ vips_col_Lab2XYZ_helper(VipsLab2XYZ *Lab2XYZ,
 	float cby, tmp;
 
 	if (L < 8.0F) {
-		*Y = (L * Lab2XYZ->Y0) / 903.3F;
-		cby = 7.787F * (*Y / Lab2XYZ->Y0) + 16.0F / 116.0F;
+		*Y = L * Lab2XYZ->Y0_div_903_3;
+		cby = 7.787F * (*Y * Lab2XYZ->inv_Y0) + 16.0F / 116.0F;
 	}
 	else {
 		cby = (L + 16.0F) / 116.0F;
@@ -156,6 +161,9 @@ vips_Lab2XYZ_build(VipsObject *object)
 		Lab2XYZ->Y0 = ((double *) Lab2XYZ->temp->data)[1];
 		Lab2XYZ->Z0 = ((double *) Lab2XYZ->temp->data)[2];
 	}
+
+	Lab2XYZ->Y0_div_903_3 = Lab2XYZ->Y0 / 903.3;
+	Lab2XYZ->inv_Y0 = 1.0 / Lab2XYZ->Y0;
 
 	if (VIPS_OBJECT_CLASS(vips_Lab2XYZ_parent_class)->build(object))
 		return -1;

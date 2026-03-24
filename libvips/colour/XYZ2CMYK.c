@@ -168,9 +168,11 @@ vips_XYZ2CMYK_line(VipsColour *colour, VipsPel *out, VipsPel **in, int width)
 			q[3] = 255;
 		}
 		else {
-			q[0] = VIPS_CLIP(0, 255 * (c - k) / ik, 255);
-			q[1] = VIPS_CLIP(0, 255 * (m - k) / ik, 255);
-			q[2] = VIPS_CLIP(0, 255 * (y - k) / ik, 255);
+			float inv_ik = 255.0F / ik;
+
+			q[0] = VIPS_CLIP(0, (c - k) * inv_ik, 255);
+			q[1] = VIPS_CLIP(0, (m - k) * inv_ik, 255);
+			q[2] = VIPS_CLIP(0, (y - k) * inv_ik, 255);
 			q[3] = VIPS_CLIP(0, 255 * k, 255);
 		}
 
