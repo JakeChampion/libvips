@@ -1045,6 +1045,11 @@ rtiff_parse_labpack(Rtiff *rtiff, VipsImage *out)
 /* Per-scanline process function for 8-bit VIPS_CODING_LAB to 16-bit LabS with
  * alpha.
  */
+/* 8-bit L to 16-bit LabS L conversion LUT.
+ */
+static short rtiff_L8_to_Ls[256];
+static gboolean rtiff_L8_to_Ls_init = FALSE;
+
 static void
 rtiff_lab_with_alpha_line(Rtiff *rtiff,
 	VipsPel *q, VipsPel *p, int n, void *dummy)
@@ -1055,12 +1060,18 @@ rtiff_lab_with_alpha_line(Rtiff *rtiff,
 	short *q1;
 	int x;
 
+	if (!rtiff_L8_to_Ls_init) {
+		for (x = 0; x < 256; x++)
+			rtiff_L8_to_Ls[x] = ((unsigned int) x) * 32767 / 255;
+		rtiff_L8_to_Ls_init = TRUE;
+	}
+
 	p1 = (unsigned char *) p;
 	q1 = (short *) q;
 	for (x = 0; x < n; x++) {
 		int i;
 
-		q1[0] = ((unsigned int) p1[0]) * 32767 / 255;
+		q1[0] = rtiff_L8_to_Ls[p1[0]];
 		q1[1] = ((short) p1[1]) << 8;
 		q1[2] = ((short) p1[2]) << 8;
 
