@@ -136,7 +136,7 @@ vips_draw_image_mode_add(VipsDrawImage *draw_image, VipsImage *im,
 		LOOP(unsigned short, int, 0, USHRT_MAX);
 		break;
 	case VIPS_FORMAT_SHORT:
-		LOOP(signed short, int, SCHAR_MIN, SCHAR_MAX);
+		LOOP(signed short, int, SHRT_MIN, SHRT_MAX);
 		break;
 	case VIPS_FORMAT_UINT:
 		LOOP(unsigned int, gint64, 0, UINT_MAX);
