@@ -99,8 +99,11 @@ G_DEFINE_TYPE(VipsIfthenelse, vips_ifthenelse, VIPS_TYPE_CONVERSION);
 		for (i = 0, x = 0; x < n; i++, x += bands) { \
 			const int v = c[i]; \
 \
-			for (z = x; z < x + bands; z++) \
-				q[z] = (v * a[z] + (255 - v) * b[z] + 128) / 255; \
+			for (z = x; z < x + bands; z++) { \
+				unsigned int t = \
+					v * a[z] + (255 - v) * b[z] + 128; \
+				q[z] = (t + 1 + (t >> 8)) >> 8; \
+			} \
 		} \
 	}
 
@@ -113,8 +116,10 @@ G_DEFINE_TYPE(VipsIfthenelse, vips_ifthenelse, VIPS_TYPE_CONVERSION);
 		for (x = 0; x < n; x += bands) { \
 			for (z = x; z < x + bands; z++) { \
 				const int v = c[z]; \
+				unsigned int t = \
+					v * a[z] + (255 - v) * b[z] + 128; \
 \
-				q[z] = (v * a[z] + (255 - v) * b[z] + 128) / 255; \
+				q[z] = (t + 1 + (t >> 8)) >> 8; \
 			} \
 		} \
 	}
