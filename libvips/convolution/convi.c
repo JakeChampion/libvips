@@ -715,6 +715,30 @@ vips_convi_gen_vector(VipsRegion *out_region,
 		} \
 	}
 
+/* Unsigned INT inner loops with multiply-shift instead of division.
+ */
+#define CONV_UINT(TYPE, STYPE, CLIP) \
+	{ \
+		TYPE *restrict p = (TYPE *) VIPS_REGION_ADDR(ir, le, y); \
+		TYPE *restrict q = (TYPE *) VIPS_REGION_ADDR(out_region, le, y); \
+		int *restrict offsets = seq->offsets; \
+\
+		for (x = 0; x < sz; x++) { \
+			STYPE sum; \
+			int i; \
+\
+			sum = 0; \
+			for (i = 0; i < nnz; i++) \
+				sum += (STYPE) t[i] * p[offsets[i]]; \
+\
+			sum = CLIP((STYPE) (((guint64) (sum + rounding) * \
+				scale_recip) >> 32) + offset); \
+\
+			q[x] = sum; \
+			p += 1; \
+		} \
+	}
+
 /* FLOAT inner loops.
  */
 #define CONV_FLOAT(TYPE) \
@@ -759,6 +783,9 @@ vips_convi_gen(VipsRegion *out_region,
 	int scale = rint(vips_image_get_scale(M));
 	int rounding = scale / 2;
 	int offset = rint(vips_image_get_offset(M));
+	guint64 scale_recip = scale > 0
+		? ((1ULL << 32) + scale - 1) / scale
+		: 0;
 	VipsImage *in = (VipsImage *) a;
 	VipsRegion *ir = seq->ir;
 	int *restrict t = convi->coeff;
@@ -805,7 +832,7 @@ vips_convi_gen(VipsRegion *out_region,
 	for (y = to; y < bo; y++) {
 		switch (in->BandFmt) {
 		case VIPS_FORMAT_UCHAR:
-			CONV_INT(unsigned char, unsigned int, CLIP_UCHAR);
+			CONV_UINT(unsigned char, unsigned int, CLIP_UCHAR);
 			break;
 
 		case VIPS_FORMAT_CHAR:
@@ -813,7 +840,7 @@ vips_convi_gen(VipsRegion *out_region,
 			break;
 
 		case VIPS_FORMAT_USHORT:
-			CONV_INT(unsigned short, unsigned int, CLIP_USHORT);
+			CONV_UINT(unsigned short, unsigned int, CLIP_USHORT);
 			break;
 
 		case VIPS_FORMAT_SHORT:
