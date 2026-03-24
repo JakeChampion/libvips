@@ -78,6 +78,36 @@
 
 #include "pconversion.h"
 
+/* Copy a single pixel using typed stores for common sizes.
+ */
+#define COPY_PEL(Q, P, PS) \
+	G_STMT_START \
+	{ \
+		switch (PS) { \
+		case 1: \
+			(Q)[0] = (P)[0]; \
+			break; \
+		case 2: \
+			*((guint16 *) (Q)) = *((guint16 *) (P)); \
+			break; \
+		case 3: \
+			(Q)[0] = (P)[0]; \
+			(Q)[1] = (P)[1]; \
+			(Q)[2] = (P)[2]; \
+			break; \
+		case 4: \
+			*((guint32 *) (Q)) = *((guint32 *) (P)); \
+			break; \
+		case 8: \
+			*((guint64 *) (Q)) = *((guint64 *) (P)); \
+			break; \
+		default: \
+			memcpy((Q), (P), (PS)); \
+			break; \
+		} \
+	} \
+	G_STMT_END
+
 typedef struct _VipsRot {
 	VipsConversion parent_instance;
 
@@ -146,8 +176,7 @@ vips_rot90_gen(VipsRegion *out_region,
 			need.top + need.height - 1);
 
 		for (x = le; x < ri; x++) {
-			for (i = 0; i < ps; i++)
-				q[i] = p[i];
+			COPY_PEL(q, p, ps);
 
 			q += ps;
 			p -= ls;
@@ -209,8 +238,7 @@ vips_rot180_gen(VipsRegion *out_region,
 		/* Blap across!
 		 */
 		for (x = le; x < ri; x++) {
-			for (i = 0; i < ps; i++)
-				q[i] = p[i];
+			COPY_PEL(q, p, ps);
 
 			q += ps;
 			p -= ps;
@@ -271,8 +299,7 @@ vips_rot270_gen(VipsRegion *out_region,
 			need.top);
 
 		for (x = le; x < ri; x++) {
-			for (i = 0; i < ps; i++)
-				q[i] = p[i];
+			COPY_PEL(q, p, ps);
 
 			q += ps;
 			p += ls;

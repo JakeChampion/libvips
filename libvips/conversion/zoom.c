@@ -71,6 +71,34 @@
 
 #include "pconversion.h"
 
+#define COPY_PEL(Q, P, PS) \
+	G_STMT_START \
+	{ \
+		switch (PS) { \
+		case 1: \
+			(Q)[0] = (P)[0]; \
+			break; \
+		case 2: \
+			*((guint16 *) (Q)) = *((guint16 *) (P)); \
+			break; \
+		case 3: \
+			(Q)[0] = (P)[0]; \
+			(Q)[1] = (P)[1]; \
+			(Q)[2] = (P)[2]; \
+			break; \
+		case 4: \
+			*((guint32 *) (Q)) = *((guint32 *) (P)); \
+			break; \
+		case 8: \
+			*((guint64 *) (Q)) = *((guint64 *) (P)); \
+			break; \
+		default: \
+			memcpy((Q), (P), (PS)); \
+			break; \
+		} \
+	} \
+	G_STMT_END
+
 typedef struct _VipsZoom {
 	VipsConversion parent_instance;
 
@@ -128,8 +156,7 @@ vips_zoom_paint_whole(VipsRegion *out_region, VipsRegion *ir, VipsZoom *zoom,
 			/* Copy each pel xfac times.
 			 */
 			for (z = 0; z < zoom->xfac; z++) {
-				for (i = 0; i < ps; i++)
-					r[i] = p[i];
+				COPY_PEL(r, p, ps);
 
 				r += ps;
 			}
