@@ -73,6 +73,8 @@ G_DEFINE_TYPE(VipsBandmean, vips_bandmean, VIPS_TYPE_BANDARY);
 	{ \
 		TYPE *p = (TYPE *) in[0]; \
 		TYPE *q = (TYPE *) out; \
+		const guint64 bands_recip = \
+			((1ULL << 32) + bands - 1) / bands; \
 \
 		for (i = 0; i < sz; i++) { \
 			STYPE sum; \
@@ -80,7 +82,8 @@ G_DEFINE_TYPE(VipsBandmean, vips_bandmean, VIPS_TYPE_BANDARY);
 			sum = 0; \
 			for (j = 0; j < bands; j++) \
 				sum += p[j]; \
-			q[i] = (sum + bands / 2) / bands; \
+			q[i] = ((guint64)(sum + bands / 2) * \
+				bands_recip) >> 32; \
 			p += bands; \
 		} \
 	}
@@ -111,6 +114,7 @@ G_DEFINE_TYPE(VipsBandmean, vips_bandmean, VIPS_TYPE_BANDARY);
 	{ \
 		TYPE *p = (TYPE *) in[0]; \
 		TYPE *q = (TYPE *) out; \
+		const TYPE inv_bands = (TYPE) 1.0 / bands; \
 \
 		for (i = 0; i < sz; i++) { \
 			TYPE sum; \
@@ -118,7 +122,7 @@ G_DEFINE_TYPE(VipsBandmean, vips_bandmean, VIPS_TYPE_BANDARY);
 			sum = 0; \
 			for (j = 0; j < bands; j++) \
 				sum += p[j]; \
-			q[i] = sum / bands; \
+			q[i] = sum * inv_bands; \
 			p += bands; \
 		} \
 	}
