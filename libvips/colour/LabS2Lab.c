@@ -59,9 +59,9 @@ vips_LabS2Lab_line(VipsColour *colour, VipsPel *out, VipsPel **in, int width)
 	int i;
 
 	for (i = 0; i < width; i++) {
-		q[0] = p[0] / (32767.0 / 100.0);
-		q[1] = p[1] / (32768.0 / 128.0);
-		q[2] = p[2] / (32768.0 / 128.0);
+		q[0] = p[0] * (100.0F / 32767.0F);
+		q[1] = p[1] * (128.0F / 32768.0F);
+		q[2] = p[2] * (128.0F / 32768.0F);
 
 		p += 3;
 		q += 3;

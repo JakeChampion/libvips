@@ -84,26 +84,26 @@ static void
 vips_col_Lab2XYZ_helper(VipsLab2XYZ *Lab2XYZ,
 	float L, float a, float b, float *X, float *Y, float *Z)
 {
-	double cby, tmp;
+	float cby, tmp;
 
-	if (L < 8.0) {
-		*Y = (L * Lab2XYZ->Y0) / 903.3;
-		cby = 7.787 * (*Y / Lab2XYZ->Y0) + 16.0 / 116.0;
+	if (L < 8.0F) {
+		*Y = (L * Lab2XYZ->Y0) / 903.3F;
+		cby = 7.787F * (*Y / Lab2XYZ->Y0) + 16.0F / 116.0F;
 	}
 	else {
-		cby = (L + 16.0) / 116.0;
+		cby = (L + 16.0F) / 116.0F;
 		*Y = Lab2XYZ->Y0 * cby * cby * cby;
 	}
 
-	tmp = a / 500.0 + cby;
-	if (tmp < 0.2069)
-		*X = Lab2XYZ->X0 * (tmp - 0.13793) / 7.787;
+	tmp = a / 500.0F + cby;
+	if (tmp < 0.2069F)
+		*X = Lab2XYZ->X0 * (tmp - 0.13793F) / 7.787F;
 	else
 		*X = Lab2XYZ->X0 * tmp * tmp * tmp;
 
-	tmp = cby - b / 200.0;
-	if (tmp < 0.2069)
-		*Z = Lab2XYZ->Z0 * (tmp - 0.13793) / 7.787;
+	tmp = cby - b / 200.0F;
+	if (tmp < 0.2069F)
+		*Z = Lab2XYZ->Z0 * (tmp - 0.13793F) / 7.787F;
 	else
 		*Z = Lab2XYZ->Z0 * tmp * tmp * tmp;
 }
