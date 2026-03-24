@@ -480,7 +480,7 @@ make_firstlast(MergeInfo *inf, Overlapping *ovlap, VipsRect *oreg)
 			TEST_ZERO(TYPE, ts, sec_zero); \
 \
 			if (!ref_zero && !sec_zero) { \
-				int inx = ((x + oreg->left - first) << BLEND_SHIFT) / bwidth; \
+				int inx = ((guint64)((x + oreg->left - first) << BLEND_SHIFT) * bwidth_recip) >> 32; \
 				int c1 = vips__icoef1[inx]; \
 				int c2 = vips__icoef2[inx]; \
 \
@@ -547,7 +547,7 @@ make_firstlast(MergeInfo *inf, Overlapping *ovlap, VipsRect *oreg)
 			TEST_ZERO(TYPE, ts, sec_zero); \
 \
 			if (!ref_zero && !sec_zero) { \
-				int inx = ((x + oreg->left - first) << BLEND_SHIFT) / bwidth; \
+				int inx = ((guint64)((x + oreg->left - first) << BLEND_SHIFT) * bwidth_recip) >> 32; \
 				double c1 = vips__coef1[inx]; \
 				double c2 = vips__coef2[inx]; \
 \
@@ -624,6 +624,9 @@ lr_blend(VipsRegion *out_region, MergeInfo *inf, Overlapping *ovlap,
 		const int first = ovlap->first[j];
 		const int last = ovlap->last[j];
 		const int bwidth = last - first;
+		const guint64 bwidth_recip = bwidth > 0
+			? ((1ULL << 32) + bwidth - 1) / bwidth
+			: 0;
 
 		switch (im->BandFmt) {
 		case VIPS_FORMAT_UCHAR:
@@ -713,6 +716,9 @@ lr_blend_labpack(VipsRegion *out_region, MergeInfo *inf, Overlapping *ovlap,
 		const int first = ovlap->first[j];
 		const int last = ovlap->last[j];
 		const int bwidth = last - first;
+		const guint64 bwidth_recip = bwidth > 0
+			? ((1ULL << 32) + bwidth - 1) / bwidth
+			: 0;
 
 		float *fq = inf->merge;
 		float *r = inf->from1;
