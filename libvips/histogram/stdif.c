@@ -99,7 +99,7 @@ vips_stdif_generate(VipsRegion *out_region,
 	VipsImage *in = (VipsImage *) a;
 	VipsStdif *stdif = (VipsStdif *) b;
 	int bands = in->Bands;
-	int npel = stdif->width * stdif->width;
+	int npel = stdif->width * stdif->height;
 
 	VipsRect irect;
 	int y;
