@@ -269,12 +269,25 @@ readslide_new(const char *filename, VipsImage *out, int level,
  * We could output plain RGB instead, but that would break
  * compatibility with older vipses.
  */
+/* Reciprocal table for unpremultiply: recip[a] = ceil(255 * 65536 / a).
+ * Then 255 * channel / a = (channel * recip[a] + 32768) >> 16.
+ */
+static guint32 unpremul_recip[256];
+static gboolean unpremul_recip_init = FALSE;
+
 static void
 argb2rgba(uint32_t *restrict buf, int64_t n, uint32_t bg)
 {
 	const uint32_t pbg = GUINT32_TO_BE((bg << 8) | 255);
 
 	int64_t i;
+
+	if (!unpremul_recip_init) {
+		unpremul_recip[0] = 0;
+		for (i = 1; i < 256; i++)
+			unpremul_recip[i] = (255U * 65536U + i - 1) / i;
+		unpremul_recip_init = TRUE;
+	}
 
 	for (i = 0; i < n; i++) {
 		uint32_t *restrict p = buf + i;
@@ -289,11 +302,16 @@ argb2rgba(uint32_t *restrict buf, int64_t n, uint32_t bg)
 			 */
 			*p = pbg;
 		else {
-			/* Undo premultiplication.
+			/* Undo premultiplication using reciprocal LUT.
 			 */
-			out[0] = 255 * ((x >> 16) & 255) / a;
-			out[1] = 255 * ((x >> 8) & 255) / a;
-			out[2] = 255 * (x & 255) / a;
+			guint32 r = unpremul_recip[a];
+
+			out[0] = VIPS_MIN(
+				(((x >> 16) & 255) * r + 32768) >> 16, 255);
+			out[1] = VIPS_MIN(
+				(((x >> 8) & 255) * r + 32768) >> 16, 255);
+			out[2] = VIPS_MIN(
+				((x & 255) * r + 32768) >> 16, 255);
 			out[3] = 255;
 		}
 	}

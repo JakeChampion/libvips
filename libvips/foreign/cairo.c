@@ -39,10 +39,33 @@
  *
  * See also openslide's argb2rgba().
  */
+/* Reciprocal table for unpremultiply: recip[a] = ceil(255 * 65536 / a).
+ * Then 255 * channel / a = (channel * recip[a] + 32768) >> 16,
+ * avoiding per-pixel integer division.
+ */
+static guint32 vips__unpremultiply_recip[256];
+static gboolean vips__unpremultiply_recip_init = FALSE;
+
+static void
+vips__build_unpremultiply_recip(void)
+{
+	if (!vips__unpremultiply_recip_init) {
+		int i;
+
+		vips__unpremultiply_recip[0] = 0;
+		for (i = 1; i < 256; i++)
+			vips__unpremultiply_recip[i] =
+				(255U * 65536U + i - 1) / i;
+		vips__unpremultiply_recip_init = TRUE;
+	}
+}
+
 void
 vips__premultiplied_bgra2rgba(guint32 *restrict p, int n)
 {
 	int x;
+
+	vips__build_unpremultiply_recip();
 
 	for (x = 0; x < n; x++) {
 		guint32 bgra = GUINT32_FROM_BE(p[x]);
@@ -56,14 +79,17 @@ vips__premultiplied_bgra2rgba(guint32 *restrict p, int n)
 				(bgra & 0x00ff00ff) |
 				(bgra & 0x0000ff00) << 16 |
 				(bgra & 0xff000000) >> 16;
-		else
-			/* Undo premultiplication.
+		else {
+			/* Undo premultiplication using reciprocal LUT.
 			 */
+			guint32 r = vips__unpremultiply_recip[a];
+
 			rgba =
-				((255 * ((bgra >> 8) & 0xff) / a) << 24) |
-				((255 * ((bgra >> 16) & 0xff) / a) << 16) |
-				((255 * ((bgra >> 24) & 0xff) / a) << 8) |
+				(VIPS_MIN(((((bgra >> 8) & 0xff) * r + 32768) >> 16), 255) << 24) |
+				(VIPS_MIN(((((bgra >> 16) & 0xff) * r + 32768) >> 16), 255) << 16) |
+				(VIPS_MIN(((((bgra >> 24) & 0xff) * r + 32768) >> 16), 255) << 8) |
 				a;
+		}
 
 		p[x] = GUINT32_TO_BE(rgba);
 	}
