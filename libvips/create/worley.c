@@ -196,34 +196,28 @@ vips_worley_start(VipsImage *out, void *a, void *b)
 }
 
 static float
-vips_int_hypot(int x, int y)
-{
-	/* Faster than hypotf() for int args.
-	 */
-	return sqrtf(x * x + y * y);
-}
-
-static float
 vips_worley_distance(VipsWorley *worley, Cell cells[9], int x, int y)
 {
-	float distance;
+	float distance_sq;
 
 	int i, j;
 
-	distance = worley->cell_size * 1.5;
+	float max_dist = worley->cell_size * 1.5F;
+	distance_sq = max_dist * max_dist;
 
 	for (i = 0; i < 9; i++) {
 		Cell *cell = &cells[i];
 
 		for (j = 0; j < cell->n_features; j++) {
-			float d =
-				vips_int_hypot(x - cell->feature_x[j], y - cell->feature_y[j]);
+			int dx = x - cell->feature_x[j];
+			int dy = y - cell->feature_y[j];
+			float d_sq = dx * dx + dy * dy;
 
-			distance = VIPS_MIN(distance, d);
+			distance_sq = VIPS_MIN(distance_sq, d_sq);
 		}
 	}
 
-	return distance;
+	return sqrtf(distance_sq);
 }
 
 static int

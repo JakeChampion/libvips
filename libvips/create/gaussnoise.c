@@ -113,7 +113,7 @@ vips_gaussnoise_gen(VipsRegion *out_region,
 			sum = 0.0;
 			for (i = 0; i < 12; i++) {
 				seed = vips__random(seed);
-				sum += (double) seed / UINT_MAX;
+				sum += seed * (1.0 / UINT_MAX);
 			}
 
 			q[x] = (sum - 6.0) * gaussnoise->sigma +
