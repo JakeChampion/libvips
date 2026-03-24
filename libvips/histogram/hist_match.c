@@ -104,8 +104,8 @@ vips_hist_match_process(VipsHistogram *histogram,
 			if (ri < limit) {
 				/* Simple rounding.
 				 */
-				double mid = refbuf[ri] +
-					refbuf[ri + bands] / 2.0;
+				double mid = (refbuf[ri] +
+					refbuf[ri + bands]) / 2.0;
 
 				if (inv < mid)
 					outbuf[i] = ri / bands;
