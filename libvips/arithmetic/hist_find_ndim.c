@@ -239,7 +239,7 @@ vips_hist_find_ndim_stop(VipsStatistic *statistic, void *seq)
 \
 		for (i = 0, j = 0; j < n; j++) { \
 			for (k = 0; k < nb; k++, i++) \
-				index[k] = p[i] / scale; \
+				index[k] = (int) (p[i] * inv_scale); \
 \
 			hist->data[index[2]][index[1]][index[0]] += 1; \
 		} \
@@ -254,6 +254,7 @@ vips_hist_find_ndim_scan(VipsStatistic *statistic, void *seq,
 	VipsImage *im = statistic->ready;
 	int nb = im->Bands;
 	double scale = (double) (ndim->max_val + 1) / ndim->bins;
+	double inv_scale = 1.0 / scale;
 	int i, j, k;
 	int index[3];
 

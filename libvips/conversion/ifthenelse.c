@@ -131,7 +131,7 @@ G_DEFINE_TYPE(VipsIfthenelse, vips_ifthenelse, VIPS_TYPE_CONVERSION);
 		TYPE *q = (TYPE *) qp; \
 \
 		for (i = 0, x = 0; x < n; i++, x += bands) { \
-			const double v = c[i] / 255.0; \
+			const double v = c[i] * (1.0 / 255.0); \
 \
 			for (z = x; z < x + bands; z++) \
 				q[z] = v * a[z] + (1.0 - v) * b[z]; \
@@ -146,7 +146,7 @@ G_DEFINE_TYPE(VipsIfthenelse, vips_ifthenelse, VIPS_TYPE_CONVERSION);
 \
 		for (x = 0; x < n; x += bands) { \
 			for (z = x; z < x + bands; z++) { \
-				const double v = c[z] / 255.0; \
+				const double v = c[z] * (1.0 / 255.0); \
 \
 				q[z] = v * a[z] + (1.0 - v) * b[z]; \
 			} \
@@ -160,7 +160,7 @@ G_DEFINE_TYPE(VipsIfthenelse, vips_ifthenelse, VIPS_TYPE_CONVERSION);
 		TYPE *q = (TYPE *) qp; \
 \
 		for (i = 0, x = 0; x < n; i++, x += bands) { \
-			const double v = c[i] / 255.0; \
+			const double v = c[i] * (1.0 / 255.0); \
 \
 			for (z = x; z < x + 2 * bands; z++) \
 				q[z] = v * a[z] + (1.0 - v) * b[z]; \
@@ -175,7 +175,7 @@ G_DEFINE_TYPE(VipsIfthenelse, vips_ifthenelse, VIPS_TYPE_CONVERSION);
 \
 		for (x = 0; x < n; x += bands) { \
 			for (z = x; z < x + bands; z++) { \
-				const double v = c[z] / 255.0; \
+				const double v = c[z] * (1.0 / 255.0); \
 \
 				q[2 * z] = v * a[2 * z] + (1.0 - v) * b[2 * z]; \
 				q[2 * z + 1] = v * a[2 * z + 1] + \
