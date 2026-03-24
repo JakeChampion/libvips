@@ -61,29 +61,10 @@ G_DEFINE_TYPE(VipsLab2LCh, vips_Lab2LCh, VIPS_TYPE_COLOUR_TRANSFORM);
 double
 vips_col_ab2h(double a, double b)
 {
-	double h;
+	double h = VIPS_DEG(atan2(b, a));
 
-	/* We have to get the right quadrant!
-	 */
-	if (a == 0) {
-		if (b < 0.0)
-			h = 270;
-		else if (b == 0.0)
-			h = 0;
-		else
-			h = 90;
-	}
-	else {
-		double t = atan(b / a);
-
-		if (a > 0.0)
-			if (b < 0.0)
-				h = VIPS_DEG(t + VIPS_PI * 2.0);
-			else
-				h = VIPS_DEG(t);
-		else
-			h = VIPS_DEG(t + VIPS_PI);
-	}
+	if (h < 0.0)
+		h += 360.0;
 
 	return h;
 }
