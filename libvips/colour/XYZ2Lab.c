@@ -80,6 +80,12 @@ typedef struct _VipsXYZ2Lab {
 	double Y0;
 	double Z0;
 
+	/* Precomputed QUANT_ELEMENTS / X0 etc. to avoid per-pixel division.
+	 */
+	float inv_X0;
+	float inv_Y0;
+	float inv_Z0;
+
 } VipsXYZ2Lab;
 
 typedef VipsColourTransformClass VipsXYZ2LabClass;
@@ -114,9 +120,9 @@ vips_col_XYZ2Lab_helper(VipsXYZ2Lab *XYZ2Lab,
 	float f;
 	float cbx, cby, cbz;
 
-	nX = QUANT_ELEMENTS * X / XYZ2Lab->X0;
-	nY = QUANT_ELEMENTS * Y / XYZ2Lab->Y0;
-	nZ = QUANT_ELEMENTS * Z / XYZ2Lab->Z0;
+	nX = X * XYZ2Lab->inv_X0;
+	nY = Y * XYZ2Lab->inv_Y0;
+	nZ = Z * XYZ2Lab->inv_Z0;
 
 	/* CLIP is much faster than FCLIP, and we want an int result.
 	 */
@@ -210,6 +216,10 @@ vips_XYZ2Lab_build(VipsObject *object)
 		XYZ2Lab->Y0 = ((double *) XYZ2Lab->temp->data)[1];
 		XYZ2Lab->Z0 = ((double *) XYZ2Lab->temp->data)[2];
 	}
+
+	XYZ2Lab->inv_X0 = QUANT_ELEMENTS / XYZ2Lab->X0;
+	XYZ2Lab->inv_Y0 = QUANT_ELEMENTS / XYZ2Lab->Y0;
+	XYZ2Lab->inv_Z0 = QUANT_ELEMENTS / XYZ2Lab->Z0;
 
 	if (VIPS_OBJECT_CLASS(vips_XYZ2Lab_parent_class)->build(object))
 		return -1;
