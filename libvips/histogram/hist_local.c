@@ -222,19 +222,17 @@ vips_hist_local_generate(VipsRegion *out_region,
 					 * always includes the current element.
 					 */
 					for (i = 0; i <= target; i++) {
-						if (hist[i] > max_slope) {
-							sum_over += hist[i] -
-								max_slope;
-							sum += max_slope;
-						}
-						else
-							sum += hist[i];
+						int h = hist[i];
+						int clamped = VIPS_MIN(h, max_slope);
+
+						sum += clamped;
+						sum_over += h - clamped;
 					}
 
 					for (; i < 256; i++) {
-						if (hist[i] > max_slope)
-							sum_over += hist[i] -
-								max_slope;
+						int h = hist[i];
+
+						sum_over += h - VIPS_MIN(h, max_slope);
 					}
 
 					/* The extra clipped off bit from the
