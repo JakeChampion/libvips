@@ -113,7 +113,7 @@ vips_col_dE00(float L1, float a1, float b1,
 	/* G
 	 */
 	double Cb7 = Cb * Cb * Cb * Cb * Cb * Cb * Cb;
-	double G = 0.5 * (1 - sqrt(Cb7 / (Cb7 + pow(25, 7))));
+	double G = 0.5 * (1 - sqrt(Cb7 / (Cb7 + 6103515625.0)));
 
 	/* L', a', b', C', h'
 	 */
@@ -142,7 +142,7 @@ vips_col_dE00(float L1, float a1, float b1,
 	double hdbd = (hdb - 275) / 25;
 	double dtheta = 30 * exp(-(hdbd * hdbd));
 	double Cdb7 = Cdb * Cdb * Cdb * Cdb * Cdb * Cdb * Cdb;
-	double RC = 2 * sqrt(Cdb7 / (Cdb7 + pow(25, 7)));
+	double RC = 2 * sqrt(Cdb7 / (Cdb7 + 6103515625.0));
 
 	/* RT, T.
 	 */
