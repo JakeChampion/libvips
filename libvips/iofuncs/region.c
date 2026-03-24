@@ -1466,10 +1466,12 @@ vips_region_shrink_uncoded(VipsRegion *from,
 					tq[z] = 0; \
 			} \
 			else { \
+				double inv_4a = 1.0 / (4.0 * a); \
+\
 				for (z = 0; z < nb - 1; z++) \
 					tq[z] = (a1 * tp[z] + a2 * tp[z + nb] + \
-								a3 * tp1[z] + a4 * tp1[z + nb]) / \
-						(4.0 * a); \
+								a3 * tp1[z] + a4 * tp1[z + nb]) * \
+						inv_4a; \
 				tq[z] = a; \
 			} \
 \
