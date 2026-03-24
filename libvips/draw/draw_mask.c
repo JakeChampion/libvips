@@ -94,11 +94,12 @@ G_DEFINE_TYPE(VipsDrawMask, vips_draw_mask, VIPS_TYPE_DRAWINK);
 		int x, i, j; \
 \
 		for (j = 0, x = 0; x < width; x++) \
-			for (i = 0; i < bands; i++, j++) \
-				tto[j] = \
-					(tink[i] * m[x] + \
-						tto[j] * (255 - m[x])) / \
-					255; \
+			for (i = 0; i < bands; i++, j++) { \
+				unsigned int t = \
+					tink[i] * m[x] + \
+					tto[j] * (255 - m[x]); \
+				tto[j] = (t + 1 + (t >> 8)) >> 8; \
+			} \
 	}
 
 /* Do the blend with doubles.
@@ -113,8 +114,8 @@ G_DEFINE_TYPE(VipsDrawMask, vips_draw_mask, VIPS_TYPE_DRAWINK);
 		for (j = 0, x = 0; x < width; x++) \
 			for (i = 0; i < bands; i++, j++) \
 				tto[j] = ((double) tink[i] * m[x] + \
-							 (double) tto[j] * (255 - m[x])) / \
-					255; \
+							 (double) tto[j] * (255 - m[x])) * \
+					(1.0 / 255); \
 	}
 
 /* Blend of complex.
@@ -130,12 +131,12 @@ G_DEFINE_TYPE(VipsDrawMask, vips_draw_mask, VIPS_TYPE_DRAWINK);
 			for (i = 0; i < bands * 2; i += 2, j += 2) { \
 				tto[j] = \
 					((double) tink[i] * m[x] + \
-						(double) tto[j] * (255 - m[x])) / \
-					255; \
+						(double) tto[j] * (255 - m[x])) * \
+					(1.0 / 255); \
 				tto[j + 1] = \
 					((double) tink[i + 1] * m[x] + \
-						(double) tto[j + 1] * (255 - m[x])) / \
-					255; \
+						(double) tto[j + 1] * (255 - m[x])) * \
+					(1.0 / 255); \
 			} \
 	}
 
