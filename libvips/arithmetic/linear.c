@@ -271,10 +271,24 @@ vips_linear_build(VipsObject *object)
 		float b1 = b[0]; \
 		int sz = width * nb; \
 \
-		for (x = 0; x < sz; x++) { \
-			float t = a1 * p[x] + b1; \
+		if (sizeof(IN) == 1) { \
+			VipsPel lut[256]; \
+			int j; \
 \
-			q[x] = VIPS_FCLIP(0, t, 255); \
+			for (j = 0; j < 256; j++) { \
+				float t = a1 * j + b1; \
+				lut[j] = VIPS_FCLIP(0, t, 255); \
+			} \
+\
+			for (x = 0; x < sz; x++) \
+				q[x] = lut[((unsigned char *) p)[x]]; \
+		} \
+		else { \
+			for (x = 0; x < sz; x++) { \
+				float t = a1 * p[x] + b1; \
+\
+				q[x] = VIPS_FCLIP(0, t, 255); \
+			} \
 		} \
 	}
 
