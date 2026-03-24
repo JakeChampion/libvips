@@ -153,6 +153,7 @@ vips_hist_local_generate(VipsRegion *out_region,
 	VipsRect *r = &out_region->valid;
 	const int bands = in->Bands;
 	const int max_slope = local->max_slope;
+	const double inv_npel = 255.0 / (local->width * local->height);
 
 	VipsRect irect;
 	int y;
@@ -254,8 +255,7 @@ vips_hist_local_generate(VipsRegion *out_region,
 				 * Scale by 255, not 256, or we'll get
 				 * overflow.
 				 */
-				q[b] = 255 * sum /
-					(local->width * local->height);
+				q[b] = sum * inv_npel;
 
 				/* Adapt histogram -- remove the pels from
 				 * the left hand column, add in pels for a
