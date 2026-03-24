@@ -436,8 +436,8 @@ make_firstlast(MergeInfo *inf, Overlapping *ovlap, VipsRect *oreg)
 					int c2 = vips__icoef2[inx]; \
 \
 					for (b = 0; b < cb; b++, i++) \
-						tq[i] = c1 * tr[i] / BLEND_SCALE + \
-							c2 * ts[i] / BLEND_SCALE; \
+						tq[i] = (c1 * tr[i] + c2 * ts[i] + \
+							BLEND_SCALE / 2) / BLEND_SCALE; \
 				} \
 				else if (!ref_zero) \
 					for (b = 0; b < cb; b++, i++) \
