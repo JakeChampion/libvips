@@ -1697,9 +1697,9 @@ XYZ2tiffxyz(VipsPel *q, VipsPel *p, int n, int samples_per_pixel)
 	for (x = 0; x < n; x++) {
 		int i;
 
-		q1[0] = p1[0] / VIPS_D65_X0;
-		q1[1] = p1[1] / VIPS_D65_Y0;
-		q1[2] = p1[2] / VIPS_D65_Z0;
+		q1[0] = p1[0] * (1.0F / VIPS_D65_X0);
+		q1[1] = p1[1] * (1.0F / VIPS_D65_Y0);
+		q1[2] = p1[2] * (1.0F / VIPS_D65_Z0);
 
 		for (i = 3; i < samples_per_pixel; i++)
 			q1[i] = p1[i];
