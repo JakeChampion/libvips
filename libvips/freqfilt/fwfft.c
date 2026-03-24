@@ -106,6 +106,7 @@ rfwfft1(VipsObject *object, VipsImage *in, VipsImage **out)
 	VipsImage **t = (VipsImage **) vips_object_local_array(object, 4);
 	VipsObjectClass *class = VIPS_OBJECT_GET_CLASS(fwfft);
 	const guint64 size = VIPS_IMAGE_N_PELS(in);
+	const double inv_size = 1.0 / size;
 	const int half_width = in->Xsize / 2 + 1;
 
 	double *half_complex;
@@ -172,8 +173,8 @@ rfwfft1(VipsObject *object, VipsImage *in, VipsImage **out)
 	q = buf;
 
 	for (x = 0; x < half_width; x++) {
-		q[0] = p[0] / size;
-		q[1] = p[1] / size;
+		q[0] = p[0] * inv_size;
+		q[1] = p[1] * inv_size;
 		p += 2;
 		q += 2;
 	}
@@ -181,8 +182,8 @@ rfwfft1(VipsObject *object, VipsImage *in, VipsImage **out)
 	p = half_complex + ((in->Xsize + 1) / 2 - 1) * 2;
 
 	for (x = half_width; x < (*out)->Xsize; x++) {
-		q[0] = p[0] / size;
-		q[1] = -1.0 * p[1] / size;
+		q[0] = p[0] * inv_size;
+		q[1] = -1.0 * p[1] * inv_size;
 		p -= 2;
 		q += 2;
 	}
@@ -195,8 +196,8 @@ rfwfft1(VipsObject *object, VipsImage *in, VipsImage **out)
 		q = buf;
 
 		for (x = 0; x < half_width; x++) {
-			q[0] = p[0] / size;
-			q[1] = p[1] / size;
+			q[0] = p[0] * inv_size;
+			q[1] = p[1] * inv_size;
 			p += 2;
 			q += 2;
 		}
@@ -209,8 +210,8 @@ rfwfft1(VipsObject *object, VipsImage *in, VipsImage **out)
 		/* clang-format on */
 
 		for (x = half_width; x < (*out)->Xsize; x++) {
-			q[0] = p[0] / size;
-			q[1] = -1.0 * p[1] / size;
+			q[0] = p[0] * inv_size;
+			q[1] = -1.0 * p[1] * inv_size;
 			p -= 2;
 			q += 2;
 		}
@@ -287,21 +288,23 @@ cfwfft1(VipsObject *object, VipsImage *in, VipsImage **out)
 
 	/* Copy to out, normalise.
 	 */
-	p = (double *) t[1]->data;
-	for (y = 0; y < (*out)->Ysize; y++) {
-		guint64 size = VIPS_IMAGE_N_PELS(*out);
+	{
+		const double inv_sz = 1.0 / VIPS_IMAGE_N_PELS(*out);
 
-		q = buf;
+		p = (double *) t[1]->data;
+		for (y = 0; y < (*out)->Ysize; y++) {
+			q = buf;
 
-		for (x = 0; x < (*out)->Xsize; x++) {
-			q[0] = p[0] / size;
-			q[1] = p[1] / size;
-			p += 2;
-			q += 2;
-		}
+			for (x = 0; x < (*out)->Xsize; x++) {
+				q[0] = p[0] * inv_sz;
+				q[1] = p[1] * inv_sz;
+				p += 2;
+				q += 2;
+			}
 
 		if (vips_image_write_line(*out, y, (VipsPel *) buf))
 			return -1;
+		}
 	}
 
 	return 0;
