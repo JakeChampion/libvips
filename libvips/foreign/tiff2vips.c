@@ -1327,18 +1327,24 @@ rtiff_parse_fourbit(Rtiff *rtiff, VipsImage *out)
 \
 		p1 = (TYPE *) p; \
 		q1 = (TYPE *) q; \
-		for (x = 0; x < n; x++) { \
-			if (invert) \
+		if (invert) \
+			for (x = 0; x < n; x++) { \
 				q1[0] = MAX - p1[0]; \
-			else \
-				q1[0] = p1[0]; \
 \
-			for (i = 1; i < samples_per_pixel; i++) \
-				q1[i] = p1[i]; \
+				for (i = 1; i < samples_per_pixel; i++) \
+					q1[i] = p1[i]; \
 \
-			q1 += samples_per_pixel; \
-			p1 += samples_per_pixel; \
-		} \
+				q1 += samples_per_pixel; \
+				p1 += samples_per_pixel; \
+			} \
+		else \
+			for (x = 0; x < n; x++) { \
+				for (i = 0; i < samples_per_pixel; i++) \
+					q1[i] = p1[i]; \
+\
+				q1 += samples_per_pixel; \
+				p1 += samples_per_pixel; \
+			} \
 	}
 
 /* GREY_LOOP implementation for 16-bit float
