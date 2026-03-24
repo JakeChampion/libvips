@@ -755,7 +755,7 @@ vips_convi_gen_vector(VipsRegion *out_region,
 			for (i = 0; i < nnz; i++) \
 				sum += (double) t[i] * p[offsets[i]]; \
 \
-			sum = (sum / scale) + offset; \
+			sum = sum * inv_scale + offset; \
 \
 			q[x] = sum; \
 			p += 1; \
@@ -786,6 +786,7 @@ vips_convi_gen(VipsRegion *out_region,
 	guint64 scale_recip = scale > 0
 		? ((1ULL << 32) + scale - 1) / scale
 		: 0;
+	double inv_scale = scale != 0 ? 1.0 / scale : 0;
 	VipsImage *in = (VipsImage *) a;
 	VipsRegion *ir = seq->ir;
 	int *restrict t = convi->coeff;

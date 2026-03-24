@@ -113,6 +113,7 @@ typedef struct {
 	int rounding;
 	int offset;
 	guint64 divisor_recip;
+	double inv_divisor;
 
 	/* The "width" of the mask, ie. n for our 1xn or nx1 argument, plus
 	 * an int version of our mask.
@@ -308,6 +309,9 @@ vips_convasep_decompose(VipsConvasep *convasep)
 	convasep->offset = offset;
 	convasep->divisor_recip = convasep->divisor > 0
 		? ((1ULL << 32) + convasep->divisor - 1) / convasep->divisor
+		: 0;
+	convasep->inv_divisor = convasep->divisor != 0
+		? 1.0 / convasep->divisor
 		: 0;
 
 #ifdef DEBUG
@@ -562,7 +566,7 @@ vips_convasep_start(VipsImage *out, void *a, void *b)
 			/* Don't add offset ... we only want to do that once, do it on \
 			 * the vertical pass. \
 			 */ \
-			sum = sum / convasep->divisor; \
+			sum = sum * convasep->inv_divisor; \
 			*q = sum; \
 			q += ostride; \
 \
@@ -574,7 +578,7 @@ vips_convasep_start(VipsImage *out, void *a, void *b)
 					sum += convasep->factor[z] * dsum[z]; \
 				} \
 				p += istride; \
-				sum = sum / convasep->divisor; \
+				sum = sum * convasep->inv_divisor; \
 				*q = sum; \
 				q += ostride; \
 			} \
