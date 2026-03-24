@@ -152,7 +152,7 @@ vips_draw_smudge_build(VipsObject *object)
 			} \
 \
 			for (b = 0; b < bands; b++) \
-				q[b] = (16 * (double) q[b] + total[b]) / 25.0; \
+				q[b] = (16 * (double) q[b] + total[b]) * (1.0 / 25.0); \
 \
 			p += bands; \
 			q += bands; \
